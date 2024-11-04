@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo da Pipa</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f0f0f0;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+</head>
+<body>
+    <script>
+        // Variáveis para o jogo
+        let pipaPos, inimigaPos, aliadaPos, pipaEspecialPos;
+        let score = 0;
+        let telaAtual = 0; // 0 - Menu, 1 - Jogo, 2 - Game Over
+        let skyTop, skyBottom;
+        let ultimaPosX = 0; // Última posição X da pipa
+        let tamanhoPipaPrincipal = 100; // Tamanho inicial da pipa principal
+
+        // Cores para as pipas
+        let coresPipaPrincipal = ['#FF0000', '#00FF00', '#0000FF', '#FFFF00'];
+        let coresPipaInimiga = ['#FF6464', '#FF9696', '#FFB8B8', '#FF3232'];
+        let coresPipaAliada = ['#64FF64', '#96FF96', '#B8FFB8', '#32FF32'];
+
+        // Variáveis para a colisão
+        let popupTexto = "";
+        let popupTempo = 0;
+        let ps; // Sistema de partículas
+
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            skyTop = color(0, 100, 200);
+            skyBottom = color(135, 206, 250);
+            resetGame();
+        }
+
+        function draw() {
+            if (telaAtual === 0) {
+                desenhaMenu();
+            } else if (telaAtual === 1) {
+                desenhaCenario();
+                movePipa();
+                desenhaPipa();
+                movimentarInimiga();
+                movimentarAliada();
+                movimentarPipaEspecial();
+                desenhaPlacar();
+                verificaColisoes();
+                ps.run();
+                desenhaPopup();
+            } else if (telaAtual === 2) {
+                // Aqui pode ser implementada a tela de Game Over
+            }
+        }
+
+        function resetGame() {
+            pipaPos = createVector(width / 2, height - 100);
+            inimigaPos = createVector(random(width), -100);
+            aliadaPos = createVector(random(width), -100);
+            pipaEspecialPos = createVector(random(width), -100);
+            ultimaPosX = pipaPos.x;
+            ps = new ParticleSystem(createVector(0, 0));
+            score = 0;
+        }
+
+        function desenhaMenu() {
+            background(239, 3, 252);
+            textAlign(CENTER);
+            textSize(32);
+            fill(255);
+            text("PUXE a linha para iniciar", width / 2, height / 2);
+        }
+
+        function desenhaCenario() {
+            for (let i = 0; i < height; i++) {
+                let inter = map(i, 0, height, 0, 1);
+                let c = lerpColor(skyTop, skyBottom, inter);
+                stroke(c);
+                line(0, i, width, i);
+            }
+        }
+
+        function desenhaPipa() {
+            fill(255);
+            let tamanho = tamanhoPipaPrincipal;
+            desenhaPipaTriangular(pipaPos.x, pipaPos.y, coresPipaPrincipal, tamanho);
+            
+            stroke(255);
+            noFill();
+            
+            let linhaBaseX = width / 2; // Ponto central da linha na parte inferior
+            let linhaY = height; // Ponto inferior da linha
+            
+            // Calcular a curvatura
+            let curvaAmplitude = 20; // Amplitude da curva
+            let curvaOffset = 0;
+            if (pipaPos.x < ultimaPosX) {
+                curvaOffset = -curvaAmplitude; // Curva para a esquerda
+            } else if (pipaPos.x > ultimaPosX) {
+                curvaOffset = curvaAmplitude; // Curva para a direita
+            }
+
+            ultimaPosX = pipaPos.x;
+
+            beginShape();
+            curveVertex(pipaPos.x + 38, pipaPos.y + tamanho / 12);
+            curveVertex(pipaPos.x + 38, pipaPos.y + tamanho / 12);
+            curveVertex(linhaBaseX + curvaOffset, pipaPos.y + 600);
+            curveVertex(linhaBaseX + curvaOffset, linhaY);
+            curveVertex(linhaBaseX + curvaOffset, linhaY);
+            endShape();
+        }
+
+        function desenhaPipaTriangular(x, y, cores, tamanho) {
+            let base = tamanho;
+            let altura = tamanho;
+            
+            for (let i = 0; i < 4; i++) {
+                fill(cores[i]);
+                noStroke();
+                
+                switch (i) {
+                    case 0:
+                        triangle(x, y, x + base / 2, y - altura, x + base / 2, y);
+                        break;
+                    case 1:
+                        triangle(x + base, y, x + base / 2, y - altura, x + base / 2, y);
+                        break;
+                    case 2:
+                        triangle(x, y, x + base / 2, y + altura, x + base / 2, y);
+                        break;
+                    case 3:
+                        triangle(x + base, y, x + base / 2, y + altura, x + base / 2, y);
+                        break;
+                }
+            }
+        }
+
+        function movimentarInimiga() {
+            inimigaPos.y += 6;
+            if (inimigaPos.y > height) {
+                inimigaPos.set(random(width), -100);
+            }
+            fill(255);
+            desenhaPipaTriangular(inimigaPos.x, inimigaPos.y, coresPipaInimiga, 60);
+        }
+
+        function movimentarAliada() {
+            aliadaPos.y += 3;
+            if (aliadaPos.y > height) {
+                aliadaPos.set(random(width), -100);
+            }
+            fill(255);
+            desenhaPipaTriangular(aliadaPos.x, aliadaPos.y, coresPipaAliada, 60);
+        }
+
+        function movimentarPipaEspecial() {
+            pipaEspecialPos.y += 4;
+            if (pipaEspecialPos.y > height) {
+                pipaEspecialPos.set(random(width), -100);
+            }
+            fill(255, 200, 0);
+            desenhaPipaTriangular(pipaEspecialPos.x, pipaEspecialPos.y, coresPipaAliada, 60);
+        }
+
+        function desenhaPlacar() {
+            textAlign(LEFT);
+            textSize(24);
+            fill(0);
+            text("Pontuação: " + score, 10, 30);
+        }
+
+        function verificaColisoes() {
+            // Verificar colisão com pipa inimiga
+            if (pipaPos.x + 50 > inimigaPos.x && pipaPos.x + 50 < inimigaPos.x + 60 &&
+                pipaPos.y < inimigaPos.y + 60) {
+                inimigaPos.set(-100, -100);
+                score += 200;
+                mostraPopup("Pontuação: +200");
+                ps.origin.set(pipaPos.x + 30, pipaPos.y + 30);
+                for (let i = 0; i < 100; i++) {
+                    ps.addParticle();
+                }
+            }
+            
+            // Verificar colisão com pipa aliada
+            if (pipaPos.x + 50 > aliadaPos.x && pipaPos.x + 50 < aliadaPos.x + 60 &&
+                pipaPos.y < aliadaPos.y + 60) {
+                aliadaPos.set(-100, -100);
+                score += 200;
+                mostraPopup("Pontuação: +200");
+                ps.origin.set(pipaPos.x + 30, pipaPos.y + 30);
+                for (let i = 0; i < 100; i++) {
+                    ps.addParticle();
+                }
+            }
+            
+            // Verificar colisão com pipa especial
+            if (pipaPos.x + 50 > pipaEspecialPos.x && pipaPos.x + 50 < pipaEspecialPos.x + 60 &&
+                pipaPos.y < pipaEspecialPos.y + 60) {
+                pipaEspecialPos.set(-100, -100);
+                score += 300;
+                mostraPopup("Pontuação: +300");
+                ps.origin.set(pipaPos.x + 30, pipaPos.y + 30);
+                for (let i = 0; i < 100; i++) {
+                    ps.addParticle();
+                }
+            }
+        }
+
+        function mostraPopup(texto) {
+            popupTexto = texto;
+            popupTempo = 40; // Exibir por 40 frames
+        }
+
+        function desenhaPopup() {
+            if (popupTempo > 0) {
+                textAlign(CENTER);
+                textSize(20);
+                fill(255);
+                text(popupTexto, width / 2, height / 2);
+                popupTempo--;
+            }
+        }
+
+        function keyPressed() {
+            if (telaAtual === 0 && keyCode === ENTER) {
+                telaAtual = 1;
+                resetGame();
+            } else if (telaAtual === 2 && key === 'r') {
+                telaAtual = 0; // Volta ao menu
+            }
+        }
+
+        function movePipa() {
+            // Ajusta a resposta do movimento da pipa
+            let velocidade = 0.4; // Reduzido para aumentar a sensibilidade
+            pipaPos.x = constrain(mouseX, 0, width - 60); // Constrange a posição horizontal
+            pipaPos.y = constrain(mouseY, 0, height - tamanhoPipaPrincipal); // Constrange a posição vertical
+        }
+
+        class ParticleSystem {
+            constructor(position) {
+                this.origin = position.copy();
+                this.particles = [];
+            }
+            
+            addParticle() {
+                this.particles.push(new Particle(this.origin));
+            }
+            
+            run() {
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    let p = this.particles[i];
+                    p.update();
+                    p.display();
+                    if (p.isFinished()) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+            }
+        }
+
+        class Particle {
+            constructor(position) {
+                this.position = position.copy();
+                this.lifespan = 255;
+                this.velocity = createVector(random(-1, 1), random(-1, 1));
+            }
+            
+            update() {
+                this.position.add(this.velocity);
+                this.lifespan -= 5;
+            }
+            
+            display() {
+                stroke(255, this.lifespan);
+                fill(255, this.lifespan);
+                ellipse(this.position.x, this.position.y, 12, 12);
+            }
+            
+            isFinished() {
+                return this.lifespan < 0;
+            }
+        }
+    </script>
+</body>
+</html>
